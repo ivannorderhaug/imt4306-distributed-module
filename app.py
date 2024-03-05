@@ -189,32 +189,32 @@ class SudokuUI(Frame):
         self.peer_text = self.canvas.create_text(self.width/2, 10, text=f"{peer.addr}:{peer.port}", fill="black")
         self.canvas.tag_lower(self.peer_text)
 
-        self.draw_grid(offset=(0, 20))
-        self.draw_puzzle( offset=(0, 20))
+        self.draw_grid()
+        self.draw_puzzle()
 
         self.canvas.bind("<Button-1>", self.cell_clicked)
         self.canvas.bind("<Key>", self.key_pressed)
 
-    def draw_grid(self, offset=(0, 0)):
+    def draw_grid(self,):
         """
         Draws grid divided with blue lines into 3x3 squares
         """
         for i in range(10):
             color = "blue" if i % 3 == 0 else "gray"
 
-            x0 = self.margin + i * self.side + offset[0]
-            y0 = self.margin + offset[1]
-            x1 = self.margin + i * self.side + offset[0]
-            y1 = self.height - self.margin + offset[1]
+            x0 = self.margin + i * self.side 
+            y0 = self.margin 
+            x1 = self.margin + i * self.side 
+            y1 = self.height - self.margin 
             self.canvas.create_line(x0, y0, x1, y1, fill=color)
 
-            x0 = self.margin + offset[0]
-            y0 = self.margin + i * self.side + offset[1]
-            x1 = self.width - self.margin + offset[0]
-            y1 = self.margin + i * self.side + offset[1]
+            x0 = self.margin 
+            y0 = self.margin + i * self.side 
+            x1 = self.width - self.margin 
+            y1 = self.margin + i * self.side 
             self.canvas.create_line(x0, y0, x1, y1, fill=color)
 
-    def draw_puzzle(self, offset=(0, 0)):
+    def draw_puzzle(self):
         """
         Fill the grid with numbers from the puzzle
         """
@@ -223,8 +223,8 @@ class SudokuUI(Frame):
             for j in range(9):
                 answer = peer.game.puzzle[i][j]
                 if answer != 0:
-                    x = self.margin + j * self.side + self.side / 2 + offset[0]
-                    y = self.margin + i * self.side + self.side / 2 + offset[1]
+                    x = self.margin + j * self.side + self.side / 2 
+                    y = self.margin + i * self.side + self.side / 2
                     original = peer.game.board[i][j]
                     color = "black" if answer == original else "sea green"
                     self.canvas.create_text(x, y, text=answer, tags="numbers", fill=color)
@@ -321,7 +321,6 @@ class Peer(DatagramProtocol):
         self.lc_ping = LoopingCall(self.send_ping)
         self.lc_ping.start(15)
         self.last_pings = {}
-        self.moves = []
         self.game = None
 
     def datagramReceived(self, data, addr):
@@ -366,7 +365,6 @@ class Peer(DatagramProtocol):
         Method to handle a move received from a peer.
         """
         move = json.loads(line)
-        self.moves.append(move)
         self.game.puzzle[move['row']][move['col']] = move['number']
         on_move_received(self)
 
@@ -618,7 +616,7 @@ if __name__ == '__main__':
         peer.game.start()
         root = Tk()    
         shared_ui_ref = SudokuUI(root, peer)
-        root.geometry("%dx%d" % (shared_ui_ref.width, shared_ui_ref.height+40))
+        root.geometry("%dx%d" % (shared_ui_ref.width, shared_ui_ref.height))
         root.resizable(False,False)
         root.protocol("WM_DELETE_WINDOW", peer.stop)
         tksupport.install(root)
