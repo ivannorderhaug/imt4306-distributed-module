@@ -59,7 +59,7 @@ class SudokuGame(object):
         Remove cells from the Sudoku board to create a puzzle.
         """
         random.seed(self.seed) 
-        cells_to_remove = random.randint(1, 2)
+        cells_to_remove = random.randint(40, 50)
         for _ in range(cells_to_remove):
             row, col = random.randint(0, 8), random.randint(0, 8)
             if board[row][col] != 0:
@@ -646,7 +646,7 @@ if __name__ == '__main__':
     if host and port: # We either create a new game or join an existing game
         reactor.callWhenRunning(peer.send_hello, (host, port))
     else:
-        peer.game = SudokuGame(1, debug=True)
+        peer.game = SudokuGame(randint(0,9999), debug=True)
         peer.game.start()
         root = Tk()    
         shared_ui_ref = SudokuUI(root, peer)
