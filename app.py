@@ -191,9 +191,23 @@ class SudokuUI(Frame):
 
         self.draw_grid()
         self.draw_puzzle()
+        self.draw_performance_stats()
 
         self.canvas.bind("<Button-1>", self.cell_clicked)
         self.canvas.bind("<Key>", self.key_pressed)
+
+    def draw_performance_stats(self):
+        """
+        Clear the previous performance stats and draw the new performance stats to the canvas.
+        """
+        self.canvas.delete("stats")
+        
+        latency = self.peer.latency_sum / self.peer.move_count if self.peer.move_count > 0 else 0
+        uptime = time.time() - self.peer.start_time
+        throughput = self.peer.move_count / uptime
+        stats = f"Latency: {latency:.6f}s --- Throughput: {throughput:.2f} moves/s"
+        self.canvas.create_text(self.width/2, self.height - 10, text=stats, fill="black", tags="stats")
+
 
     def draw_grid(self,):
         """
@@ -320,8 +334,13 @@ class Peer(DatagramProtocol):
         self.port = randint(49152, 65535)
         self.lc_ping = LoopingCall(self.send_ping)
         self.lc_ping.start(15)
+        self.lc_stats = LoopingCall(refresh_stats)
+        self.lc_stats.start(1)
         self.last_pings = {}
+        self.start_time = 0
         self.game = None
+        self.move_count = 0
+        self.latency_sum = 0
 
     def datagramReceived(self, data, addr):
         """
@@ -352,6 +371,8 @@ class Peer(DatagramProtocol):
         if peer not in self.peers:
             self.peers.add(peer)
             self.send_hello(peer, include_peers=True)
+            if self.start_time == 0:
+                self.start_time = time.time()
             if not self.game:
                 time.sleep(0.5)
                 self.ask_for_gamedata(peer)
@@ -366,13 +387,18 @@ class Peer(DatagramProtocol):
         """
         move = json.loads(line)
         self.game.puzzle[move['row']][move['col']] = move['number']
+        latency = time.time() - move['timestamp']
+        self.latency_sum += latency
+        self.move_count += 1
         on_move_received(self)
 
     def send_move(self, row, col, number):
         """
         Method to send a move to all online peers.
         """
-        move = json.dumps({'row': row, 'col': col, 'number': number, 'msgtype': 'move'})
+        timestamp = time.time()
+        self.move_count += 1
+        move = json.dumps({'row': row, 'col': col, 'number': number, 'timestamp': timestamp, 'msgtype': 'move'})
         move = move.encode('utf-8')
         for peer in self.peers:
             self.transport.write(move, peer)
@@ -539,6 +565,14 @@ def on_move_received(peer):
         if peer.game.check_win():
             shared_ui_ref.draw_victory()
 
+
+def refresh_stats():
+    """
+        Helper function to refresh the performance stats.
+    """
+    global shared_ui_ref
+    if shared_ui_ref and peer.move_count > 0 and peer.start_time > 0:
+        shared_ui_ref.draw_performance_stats()
 
 """
     Main function to start the client.
