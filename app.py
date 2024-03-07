@@ -79,7 +79,6 @@ if __name__ == '__main__':
     if host and port: # We either create a new game or join an existing game
         reactor.callWhenRunning(peer.send_hello, (host, port))
         reactor.callWhenRunning(reactor.callLater, 0.05, ui.ask_for_gamedata, (host, port))
-        reactor.callWhenRunning(reactor.callLater, 0.1, ui.init_ui)
     else:
         game.start()
         ui.init_ui()

@@ -52,14 +52,16 @@ class UI(Frame):
         Draw the performance metrics to the canvas.
         """
         self.performance_canvas.delete("performance")
-        if self.peer.messages_count > 0:
-            latency = self.peer.latency_sum / self.peer.messages_count
-            self.performance_canvas.create_text(self.width/2, 10, text=f"Latency: {latency:.6f}s", tags="performance", fill="black")
-            self.performance_canvas.create_text(self.width/2, 25, text=f"Throughput: {self.peer.throughput:.2f} msg/s", tags="performance", fill="black")
+        self.peer.get_performance()
+        if self.peer.latency > 0:
+            self.performance_canvas.create_text(self.width/2, 10, text=f"Latency: {self.peer.latency:.6f}s", tags="performance", fill="black")
         else:
             self.performance_canvas.create_text(self.width/2, 10, text="Latency: N/A", tags="performance", fill="black")
+        
+        if self.peer.throughput > 0:
+            self.performance_canvas.create_text(self.width/2, 25, text=f"Throughput: {self.peer.throughput:.2f} msg/s", tags="performance", fill="black")
+        else:
             self.performance_canvas.create_text(self.width/2, 25, text="Throughput: N/A", tags="performance", fill="black")
-
 
     def draw_grid(self,):
         """
@@ -111,11 +113,9 @@ class UI(Frame):
         """
         Draw a 'victory' text to the canvas.
         """
-        x0 = y0 = self.margin + self.side * 2
-        x1 = y1 = self.margin + self.side * 7
-        self.canvas.create_oval(x0, y0, x1, y1, tags="victory", fill="dark orange", outline="orange")
         x = y = self.margin + 4 * self.side + self.side / 2
         self.canvas.create_text(x, y, text="You win!", tags="victory", fill="white", font=("Arial", 32))
+        self.game.puzzle = None
         self.game.start()
         self.after(2000, self.clear_answers)
 
@@ -127,7 +127,6 @@ class UI(Frame):
             return
         x, y = event.x, event.y
         if self.margin < x < self.width - self.margin and self.margin < y < self.height - self.margin:
-            #self.canvas.focus_set()
             self.row, self.col = int((y - self.margin) / self.side), int((x - self.margin) / self.side)
         else:
             self.row, self.col = -1, -1
@@ -189,8 +188,11 @@ class UI(Frame):
         """
         move = json.dumps({'row': row, 'col': col, 'number': number, 'addr':f'{self.peer.addr}','port':f'{self.peer.port}','msgtype': 'move'})
         move = move.encode('utf-8')
-        for peer in self.peer.peers:
-            self.peer.transport.write(move, peer)
+        try:
+            for peer in self.peer.peers:
+                self.peer.transport.write(move, peer)
+        except:
+            pass
 
     def ask_for_gamedata(self, addr):
         """
@@ -198,7 +200,10 @@ class UI(Frame):
         """
         ask = json.dumps({'addr': self.peer.addr, 'port': self.peer.port, 'msgtype': 'ask_gamedata'})
         ask = ask.encode('utf-8')
-        self.peer.transport.write(ask, addr)
+        try:
+            self.peer.transport.write(ask, addr)
+        except:
+            pass
 
     def handle_ask_for_gamedata(self, line):
         """
@@ -220,7 +225,10 @@ class UI(Frame):
         })
         
         gamedata = gamedata.encode('utf-8')
-        self.peer.transport.write(gamedata, addr)
+        try:
+            self.peer.transport.write(gamedata, addr)
+        except:
+            pass
 
     def handle_gamedata(self, line):
         """
@@ -231,3 +239,10 @@ class UI(Frame):
         self.game = Game(gamedata['seed'])
         self.game.puzzle = gamedata['puzzle']
         self.game.start()
+        if not hasattr(self, 'canvas'):
+            self.init_ui()
+        self.draw_puzzle()
+        if self.game.check_win():
+            self.draw_victory()
+      
+        

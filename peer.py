@@ -20,8 +20,7 @@ class Peer(DatagramProtocol):
             "pong": self.handle_pong,
         }
         self.addr = next((netifaces.ifaddresses(interface)[netifaces.AF_INET][0]['addr'] for interface in netifaces.interfaces()[1:] if netifaces.AF_INET in netifaces.ifaddresses(interface)), None)
-        #self.port = randint(49152, 65535)
-        self.port = randint(1200, 1299)
+        self.port = randint(49152, 65535)
         self.lc_ping = LoopingCall(self.send_ping)
         reactor.callInThread(self.lc_ping.start, 1)
         self.last_pings = {}
@@ -30,6 +29,7 @@ class Peer(DatagramProtocol):
         self.messages_count = 0
         self.latency_sum = 0
         self.throughput = 0
+        self.latency = 0
 
     def datagramReceived(self, data, addr):
         """
@@ -91,7 +91,10 @@ class Peer(DatagramProtocol):
 
         hello = json.dumps(hello)
         hello = hello.encode('utf-8')
-        self.transport.write(hello, addr)
+        try:
+            self.transport.write(hello, addr)
+        except:
+            pass
 
     def send_bye(self, addr):
         """
@@ -115,12 +118,15 @@ class Peer(DatagramProtocol):
         self.current_time = time.time()
         ping = json.dumps({'addr': self.addr, 'port': self.port, 'msgtype': 'ping', 'timestamp': self.current_time})
         ping = ping.encode('utf-8')
-        for peer in self.peers.copy():
-            self.transport.write(ping, peer)
-            if peer in self.last_pings and time.time() - self.last_pings[peer] > 10:
-                print(f"No response from {peer}. It appears to have gone offline.")
-                self.peers.remove(peer)
-                del self.last_pings[peer]
+        try:
+            for peer in self.peers.copy():
+                self.transport.write(ping, peer)
+                if peer in self.last_pings and time.time() - self.last_pings[peer] > 10:
+                    print(f"No response from {peer}. It appears to have gone offline.")
+                    self.peers.remove(peer)
+                    del self.last_pings[peer]
+        except:
+            pass
     
     def handle_ping(self, line):
         """
@@ -131,7 +137,6 @@ class Peer(DatagramProtocol):
         latency = pong_timestamp - ping['timestamp']
         self.latency_sum += latency
         self.messages_count += 1
-        self.get_throughput()
         self.send_pong((ping['addr'], ping['port']), pong_timestamp)
     
     def send_pong(self, addr, pong_timestamp):
@@ -140,7 +145,10 @@ class Peer(DatagramProtocol):
         """
         pong = json.dumps({'addr': self.addr, 'port': self.port, 'msgtype': 'pong', 'timestamp': pong_timestamp})
         pong = pong.encode('utf-8')
-        self.transport.write(pong, addr)
+        try:
+            self.transport.write(pong, addr)
+        except:
+            pass
 
     def handle_pong(self, line):
         """
@@ -151,10 +159,9 @@ class Peer(DatagramProtocol):
         latency = time.time() - timestamp
         self.latency_sum += latency
         self.messages_count += 1
-        self.get_throughput()
         self.last_pings[(pong['addr'], pong['port'])] = timestamp
 
-    def get_throughput(self):
+    def get_performance(self):
         """
         Method to get the throughput of the client.
         """
@@ -162,6 +169,10 @@ class Peer(DatagramProtocol):
             current_time = time.time()
             elapsed_time = current_time - self.start_time
             self.throughput = self.messages_count / elapsed_time
+            self.latency = self.latency_sum / self.messages_count if self.messages_count > 0 else 0
+            self.start_time = current_time
+            self.messages_count = 0
+            self.latency_sum = 0
         
     def stop(self):
         """
